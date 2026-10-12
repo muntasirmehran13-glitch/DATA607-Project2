@@ -1,0 +1,277 @@
+---
+title: "DATA607_Project2"
+format: html
+editor: visual
+---
+
+```{r}
+
+library(tidyverse)
+library(lubridate)
+
+```
+
+## Dataset 1 - Populous States
+
+```{r}
+
+library(tidyverse)
+
+population <- read_csv("census_top10_states_2022_untidy.csv")
+
+head(population)
+glimpse(population)
+
+
+```
+
+```{r}
+
+# Convert population data from wide to long format
+population_long <- population %>%
+  pivot_longer(
+    cols = -c(Rank, `Geographic Area`),
+    names_to = "Year",
+    values_to = "Population"
+  )
+
+# View 
+head(population_long)
+
+```
+
+```{r}
+
+# Calculate population changes from 2020 to 2022
+population_change <- population_long %>%
+  filter(Year %in% c(
+    "April 1, 2020 (Estimates Base)",
+    "July 1, 2022"
+  )) %>%
+  select(`Geographic Area`, Year, Population) %>%
+  pivot_wider(
+    names_from = Year,
+    values_from = Population
+  ) %>%
+  mutate(
+    Population_Change = `July 1, 2022` -
+      `April 1, 2020 (Estimates Base)`,
+    Percent_Change = round(
+      Population_Change /
+        `April 1, 2020 (Estimates Base)` * 100, 2
+    )
+  ) %>%
+  arrange(desc(Percent_Change))
+
+# Display results
+print(population_change)
+
+# Display all columns
+print(population_change, width = Inf)
+
+
+```
+
+## Results & Conclusions
+
+After changing the populace data from wide to long, I computed the population changes for the top 10 most populous states between April 2020 and July 2022.
+
+Florida had the greatest percent increase with 3.28%, rigth before Texas at 3.03%. However, Texas had the biggest numerical increase, getting about 884,000 residents.
+
+New York seemed to have experienced the biggest percent decrease at 2.59 %, which equated to a loss of 524,000 residents. California and illinois also faced apparent population declines.
+
+## Dataset 2: US Average Tuition (2004–2016)
+
+```{r}
+
+# Dataset 2: US Average Tuition
+
+tuition <- read_csv("us_avg_tuition(Table 5).csv")
+
+# Inspect the dataset
+head(tuition)
+glimpse(tuition)
+
+# Check missing values
+colSums(is.na(tuition))
+
+
+names(tuition)
+
+
+```
+
+```{r}
+
+# Transform from wide to long format
+tuition_long <- tuition %>%
+  pivot_longer(
+    cols = -State,
+    names_to = "Academic_Year",
+    values_to = "Tuition"
+  ) %>%
+  mutate(
+    Tuition = readr::parse_number(as.character(Tuition))
+  )
+
+# Check transformed data
+head(tuition_long)
+
+# Average tuition by state across all years
+state_avg <- tuition_long %>%
+  group_by(State) %>%
+  summarise(
+    Average_Tuition = round(mean(Tuition, na.rm = TRUE), 2),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(Average_Tuition))
+
+print(state_avg, n = 10)
+
+# Highest tuition states in 2015-16
+highest_tuition <- tuition_long %>%
+  filter(Academic_Year == "2015-16") %>%
+  arrange(desc(Tuition))
+
+print(head(highest_tuition, 10))
+
+# Compare tuition in the first and last years
+tuition_change <- tuition_long %>%
+  filter(Academic_Year %in% c("2004-05", "2015-16")) %>%
+  pivot_wider(
+    names_from = Academic_Year,
+    values_from = Tuition
+  ) %>%
+  mutate(
+    Change = `2015-16` - `2004-05`,
+    Percent_Change = round(Change / `2004-05` * 100, 2)
+  ) %>%
+  arrange(desc(Percent_Change))
+
+print(tuition_change, n = 10)
+
+# Average tuition across states by academic year
+yearly_tuition <- tuition_long %>%
+  group_by(Academic_Year) %>%
+  summarise(
+    Average_Tuition = mean(Tuition, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Plot tuition trends
+ggplot(yearly_tuition,
+       aes(x = Academic_Year, y = Average_Tuition, group = 1)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point() +
+  labs(
+    title = "Average US Tuition, 2004-2016",
+    x = "Academic Year",
+    y = "Average Tuition ($)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+
+head(state_avg, 5)
+head(tuition_change, 5)
+tail(tuition_change, 5)
+
+```
+
+## Results & Conclusions
+
+After transforming the tuition dataset from wide to long, I was able to compare every state's tuition throughout academic years.
+
+Seeing the results, Iowa faced a 15.62% increase between 2004-05 and 2015-16, while Missouri went up by 14.54% and Montana went up by 12.81%. Maryland also saw an upwards of 7.41%.
+
+Ohio showcased a 1.75% decrease over the same period. This insinuates that tuiton trends were not uniform throughout the states.
+
+## Dataset 3: Business Costs and Revenue
+
+```{r}
+
+# Dataset 3: Business Costs and Revenue
+
+business <- read_csv("5A_BusinessCostsRevenue.csv")
+
+# Inspect structure
+head(business)
+names(business)
+glimpse(business)
+
+```
+
+```{r}
+
+# Standardize column names
+business_clean <- business %>%
+  rename(
+    Jan_Cost = `Jan Cost`,
+    Jan_Revenue = `Jan Revenue`,
+    Feb_Cost = `Feb Cost (k)`,
+    Feb_Revenue = `Feb Revenue`,
+    March_Cost = `March Cost (k)`,
+    March_Revenue = `March Revenue`,
+    April_Cost = April_Cost,
+    April_Revenue = April_revenue,
+    May_Cost = `May Cost`,
+    May_Revenue = `may revenue`,
+    June_Cost = `June Cost`,
+    June_Revenue = `June Revenue`
+  ) %>%
+  mutate(
+    Feb_Cost = Feb_Cost * 1000,
+    March_Cost = March_Cost * 1000
+  )
+
+# Convert wide data into long format
+business_long <- business_clean %>%
+  pivot_longer(
+    cols = -c(Location, Name),
+    names_to = c("Month", ".value"),
+    names_sep = "_"
+  ) %>%
+  mutate(
+    Month = factor(
+      Month,
+      levels = c("Jan", "Feb", "March",
+                 "April", "May", "June")
+    ),
+    Profit = Revenue - Cost
+  )
+
+# Inspect transformed data
+print(business_long, n = 30)
+
+```
+
+```{r}
+
+
+# Calculate monthly business performance
+monthly_summary <- business_long %>%
+  group_by(Month) %>%
+  summarise(
+    Total_Cost = sum(Cost, na.rm = TRUE),
+    Total_Revenue = sum(Revenue, na.rm = TRUE),
+    Total_Profit = sum(Profit, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+print(monthly_summary)
+
+
+```
+
+## Results & Conclusions
+
+After cleaning the business dataset via standardization of column names and dollar conversions across february and March, I was able to restructure the data into long form and compute profits by reducing costs from revenue.
+
+The results show that January produced 50,000 in profit, then came March with 49,000 and February with 43,000. April was the single month with a staggering loss of 22,000.
+
+The sudden profit gain of 6, 145, 000 in May showed an unusual turnout that may need to be studied before coming towards conclusive business decision.
+
+Ultimately, reshaping the dataset facilitated the process of comparing monthly performance and pinpont unusual observations that can affect analysis.
